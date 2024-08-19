@@ -242,7 +242,7 @@ void SSAControlFlowGraphBuilder::operator()(Switch const& _switch)
 		auto makeValueCompare = [&](Case const& _case) {
 			yul::FunctionCall const& ghostCall = m_graph.ghostCalls.emplace_back(yul::FunctionCall{
 				debugDataOf(_case),
-				yul::Identifier{{}, "eq"_yulstring},
+				yul::Identifier{{}, "eq"_yulname},
 				{*_case.value /* skip second argument */ }
 			});
 			auto outputValue = m_graph.newVariable(m_currentBlock);
