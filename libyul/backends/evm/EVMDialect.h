@@ -68,8 +68,11 @@ struct EVMDialect: public Dialect
 	EVMDialect(langutil::EVMVersion _evmVersion, bool _objectAccess);
 
 	/// @returns the builtin function of the given name or a nullptr if it is not a builtin function.
-	BuiltinFunctionForEVM const* builtin(YulName _name) const override;
+	std::optional<BuiltinHandle> builtin(YulName _name) const override;
+	std::optional<VerbatimHandle> verbatim(YulName name) const override;
 
+	BuiltinFunctionForEVM const& builtinFunction(BuiltinHandle const& handle) const override;
+	BuiltinFunctionForEVM const& verbatimFunction(VerbatimHandle const&) const override;
 	/// @returns true if the identifier is reserved. This includes the builtins too.
 	bool reservedIdentifier(YulName _name) const override;
 
@@ -92,12 +95,12 @@ struct EVMDialect: public Dialect
 	static SideEffects sideEffectsOfInstruction(evmasm::Instruction _instruction);
 
 protected:
-	BuiltinFunctionForEVM const* verbatimFunction(size_t _arguments, size_t _returnVariables) const;
+	VerbatimHandle verbatimFunction(size_t _arguments, size_t _returnVariables) const;
 
 	bool const m_objectAccess;
 	langutil::EVMVersion const m_evmVersion;
-	std::map<YulName, BuiltinFunctionForEVM> m_functions;
-	std::map<std::pair<size_t, size_t>, std::shared_ptr<BuiltinFunctionForEVM const>> mutable m_verbatimFunctions;
+	std::vector<BuiltinFunctionForEVM> m_functions;
+	std::map<std::pair<size_t, size_t>, BuiltinFunctionForEVM> mutable m_verbatimFunctions;
 	std::set<YulName> m_reserved;
 };
 

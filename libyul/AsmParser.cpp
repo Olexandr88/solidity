@@ -400,7 +400,7 @@ Statement Parser::parseStatement()
 	// Options left:
 	// Expression/FunctionCall
 	// Assignment
-	std::variant<Literal, Identifier> elementary(parseLiteralOrIdentifier());
+	std::variant<Literal, Identifier, Builtin, Verbatim> elementary(parseLiteralOrIdentifier());
 
 	switch (currentToken())
 	{
@@ -430,11 +430,17 @@ Statement Parser::parseStatement()
 				);
 			}
 
+			if (std::holds_alternative<Builtin>(elementary) || std::holds_alternative<Verbatim>(elementary))
+			{
+				std::string name;
+				if (std::holds_alternative<Builtin>(elementary))
+					name = m_dialect.builtinFunction(std::get<Builtin>(elementary).handle).name.str();
+				else
+					name = m_dialect.verbatimFunction(std::get<Verbatim>(elementary).handle).name.str();
+				fatalParserError(6272_error, "Cannot assign to builtin function \"" + name + "\".");
+			}
+
 			auto const& identifier = std::get<Identifier>(elementary);
-
-			if (m_dialect.builtin(identifier.name))
-				fatalParserError(6272_error, "Cannot assign to builtin function \"" + identifier.name.str() + "\".");
-
 			assignment.variableNames.emplace_back(identifier);
 
 			if (currentToken() != Token::Comma)
@@ -470,7 +476,7 @@ Case Parser::parseCase()
 	else if (currentToken() == Token::Case)
 	{
 		advance();
-		std::variant<Literal, Identifier> literal = parseLiteralOrIdentifier();
+		auto literal = parseLiteralOrIdentifier();
 		if (!std::holds_alternative<Literal>(literal))
 			fatalParserError(4805_error, "Literal expected.");
 		_case.value = std::make_unique<Literal>(std::get<Literal>(std::move(literal)));
@@ -509,19 +515,35 @@ Expression Parser::parseExpression(bool _unlimitedLiteralArgument)
 {
 	RecursionGuard recursionGuard(*this);
 
-	std::variant<Literal, Identifier> operation = parseLiteralOrIdentifier(_unlimitedLiteralArgument);
+	std::variant<Literal, Identifier, Builtin, Verbatim> operation = parseLiteralOrIdentifier(_unlimitedLiteralArgument);
 	return visit(GenericVisitor{
 		[&](Identifier& _identifier) -> Expression
 		{
 			if (currentToken() == Token::LParen)
 				return parseCall(std::move(operation));
-			if (m_dialect.builtin(_identifier.name))
-				fatalParserError(
-					7104_error,
-					nativeLocationOf(_identifier),
-					"Builtin function \"" + _identifier.name.str() + "\" must be called."
-				);
 			return std::move(_identifier);
+		},
+	 	[&](Builtin& _builtin) -> Expression
+		{
+			if (currentToken() == Token::LParen)
+				return parseCall(std::move(operation));
+			fatalParserError(
+				7104_error,
+				nativeLocationOf(_builtin),
+				"Builtin function \"" + m_dialect.builtinFunction(_builtin.handle).name.str() + "\" must be called."
+			);
+			return std::move(_builtin);
+		},
+		[&](Verbatim& _verbatim) -> Expression
+		{
+			if (currentToken() == Token::LParen)
+				return parseCall(std::move(operation));
+			fatalParserError(
+			   7104_error,
+			   nativeLocationOf(_verbatim),
+			   "Builtin function \"" + m_dialect.verbatimFunction(_verbatim.handle).name.str() + "\" must be called."
+			);
+			return std::move(_verbatim);
 		},
 		[&](Literal& _literal) -> Expression
 		{
@@ -530,16 +552,31 @@ Expression Parser::parseExpression(bool _unlimitedLiteralArgument)
 	}, operation);
 }
 
-std::variant<Literal, Identifier> Parser::parseLiteralOrIdentifier(bool _unlimitedLiteralArgument)
+std::variant<Literal, Identifier, Builtin, Verbatim> Parser::parseLiteralOrIdentifier(bool _unlimitedLiteralArgument)
 {
 	RecursionGuard recursionGuard(*this);
 	switch (currentToken())
 	{
 	case Token::Identifier:
 	{
-		Identifier identifier{createDebugData(), YulName{currentLiteral()}};
-		advance();
-		return identifier;
+		if (auto builtinHandle = m_dialect.builtin(YulString(currentLiteral())))
+		{
+			Builtin builtin{createDebugData(), *builtinHandle};
+			advance();
+			return builtin;
+		}
+		else if (auto verbatimHandle = m_dialect.verbatim(YulString(currentLiteral())))
+		{
+			Verbatim verbatim{createDebugData(), *verbatimHandle};
+			advance();
+			return verbatim;
+		}
+		else
+		{
+			Identifier identifier{createDebugData(), YulName{currentLiteral()}};
+			advance();
+			return identifier;
+		}
 	}
 	case Token::StringLiteral:
 	case Token::HexStringLiteral:
@@ -666,21 +703,47 @@ FunctionDefinition Parser::parseFunctionDefinition()
 	return funDef;
 }
 
-FunctionCall Parser::parseCall(std::variant<Literal, Identifier>&& _initialOp)
+FunctionCall Parser::parseCall(std::variant<Literal, Identifier, Builtin, Verbatim>&& _initialOp)
 {
 	RecursionGuard recursionGuard(*this);
 
-	if (!std::holds_alternative<Identifier>(_initialOp))
-		fatalParserError(9980_error, "Function name expected.");
+	std::function<bool(size_t)> isUnlimitedLiteralArgument = [](size_t) { return false; };
+	auto ret = visit(GenericVisitor{
+		[&](Literal&)-> FunctionCall
+		{
+			fatalParserError(9980_error, "Function name expected.");
+			return {};
+		},
+		[&](Identifier& _identifier)-> FunctionCall
+		{
+			FunctionCall ret;
+			ret.debugData = _identifier.debugData;
+			ret.functionName = std::move(_identifier);
+			return ret;
+		},
+		[&](Builtin& _builtin) -> FunctionCall
+		{
+			FunctionCall ret;
+			ret.debugData = _builtin.debugData;
+			ret.functionName = std::move(_builtin);
+			// todo isUnlimitedLitArg based on dialect builtin
+			/*auto const isUnlimitedLiteralArgument = [f=m_dialect.builtin(ret.functionName.name)](size_t const index) {
+				if (f && index < f->literalArguments.size())
+					return f->literalArgument(index).has_value();
+				return false;
+			};*/
+			return ret;
+		},
+		[&](Verbatim& _verbatim) -> FunctionCall
+		{
+			FunctionCall ret;
+			ret.debugData = _verbatim.debugData;
+			ret.functionName = std::move(_verbatim);
+			isUnlimitedLiteralArgument = [](size_t) { return true; };
+			return ret;
+		}
+	}, _initialOp);
 
-	FunctionCall ret;
-	ret.functionName = std::move(std::get<Identifier>(_initialOp));
-	ret.debugData = ret.functionName.debugData;
-	auto const isUnlimitedLiteralArgument = [f=m_dialect.builtin(ret.functionName.name)](size_t const index) {
-		if (f && index < f->literalArguments.size())
-			return f->literalArgument(index).has_value();
-		return false;
-	};
 	size_t argumentIndex {0};
 	expectToken(Token::LParen);
 	if (currentToken() != Token::RParen)

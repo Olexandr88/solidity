@@ -32,6 +32,7 @@
 #include <libyul/backends/evm/AbstractAssembly.h>
 
 #include <regex>
+#include <vector>
 
 using namespace std::string_literals;
 using namespace solidity;
@@ -41,15 +42,15 @@ using namespace solidity::util;
 namespace
 {
 
-std::pair<YulName, BuiltinFunctionForEVM> createEVMFunction(
+BuiltinFunctionForEVM createEVMFunction(
 	langutil::EVMVersion _evmVersion,
 	std::string const& _name,
 	evmasm::Instruction _instruction
 )
 {
-	evmasm::InstructionInfo info = evmasm::instructionInfo(_instruction, _evmVersion);
 	BuiltinFunctionForEVM f;
-	f.name = YulName{_name};
+    evmasm::InstructionInfo info = evmasm::instructionInfo(_instruction, _evmVersion);
+    f.name = YulName{_name};
 	f.numParameters = static_cast<size_t>(info.args);
 	f.numReturns = static_cast<size_t>(info.ret);
 	f.sideEffects = EVMDialect::sideEffectsOfInstruction(_instruction);
@@ -77,13 +78,11 @@ std::pair<YulName, BuiltinFunctionForEVM> createEVMFunction(
 	) {
 		_assembly.appendInstruction(_instruction);
 	};
-
-	YulName name = f.name;
-	return {name, std::move(f)};
+	return f;
 }
 
-std::pair<YulName, BuiltinFunctionForEVM> createFunction(
-	std::string _name,
+BuiltinFunctionForEVM createFunction(
+	std::string const& _name,
 	size_t _params,
 	size_t _returns,
 	SideEffects _sideEffects,
@@ -93,17 +92,16 @@ std::pair<YulName, BuiltinFunctionForEVM> createFunction(
 {
 	yulAssert(_literalArguments.size() == _params || _literalArguments.empty(), "");
 
-	YulName name{std::move(_name)};
 	BuiltinFunctionForEVM f;
-	f.name = name;
+	f.name = YulName(_name);
 	f.numParameters = _params;
 	f.numReturns = _returns;
-	f.sideEffects = std::move(_sideEffects);
+	f.sideEffects = _sideEffects;
 	f.literalArguments = std::move(_literalArguments);
 	f.isMSize = false;
 	f.instruction = {};
 	f.generateCode = std::move(_generateCode);
-	return {name, f};
+	return f;
 }
 
 std::set<YulName> createReservedIdentifiers(langutil::EVMVersion _evmVersion)
@@ -177,7 +175,7 @@ std::set<YulName> createReservedIdentifiers(langutil::EVMVersion _evmVersion)
 	return reserved;
 }
 
-std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVersion, bool _objectAccess)
+std::vector<BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVersion, bool _objectAccess)
 {
 
 	// Exclude prevrandao as builtin for VMs before paris and difficulty for VMs after paris.
@@ -186,7 +184,7 @@ std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _ev
 		return (_instrName == "prevrandao" && _evmVersion < langutil::EVMVersion::paris()) || (_instrName == "difficulty" && _evmVersion >= langutil::EVMVersion::paris());
 	};
 
-	std::map<YulName, BuiltinFunctionForEVM> builtins;
+	std::vector<BuiltinFunctionForEVM> builtins;
 	for (auto const& instr: evmasm::c_instructions)
 	{
 		std::string name = toLower(instr.first);
@@ -202,12 +200,12 @@ std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _ev
 			_evmVersion.hasOpcode(opcode) &&
 			!prevRandaoException(name)
 		)
-			builtins.emplace(createEVMFunction(_evmVersion, name, opcode));
+			builtins.push_back(createEVMFunction(_evmVersion, name, opcode));
 	}
 
 	if (_objectAccess)
 	{
-		builtins.emplace(createFunction("linkersymbol", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+		builtins.push_back(createFunction("linkersymbol", 1, 1, SideEffects{}, {LiteralKind::String}, [](
 			FunctionCall const& _call,
 			AbstractAssembly& _assembly,
 			BuiltinContext&
@@ -217,7 +215,7 @@ std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _ev
 			_assembly.appendLinkerSymbol(formatLiteral(std::get<Literal>(arg)));
 		}));
 
-		builtins.emplace(createFunction(
+		builtins.push_back(createFunction(
 			"memoryguard",
 			1,
 			1,
@@ -235,7 +233,7 @@ std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _ev
 			})
 		);
 
-		builtins.emplace(createFunction("datasize", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+		builtins.push_back(createFunction("datasize", 1, 1, SideEffects{}, {LiteralKind::String}, [](
 			FunctionCall const& _call,
 			AbstractAssembly& _assembly,
 			BuiltinContext& _context
@@ -256,7 +254,7 @@ std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _ev
 				_assembly.appendDataSize(subIdPath);
 			}
 		}));
-		builtins.emplace(createFunction("dataoffset", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+		builtins.push_back(createFunction("dataoffset", 1, 1, SideEffects{}, {LiteralKind::String}, [](
 			FunctionCall const& _call,
 			AbstractAssembly& _assembly,
 			BuiltinContext& _context
@@ -277,7 +275,7 @@ std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _ev
 				_assembly.appendDataOffset(subIdPath);
 			}
 		}));
-		builtins.emplace(createFunction(
+		builtins.push_back(createFunction(
 			"datacopy",
 			3,
 			0,
@@ -301,7 +299,7 @@ std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _ev
 				_assembly.appendInstruction(evmasm::Instruction::CODECOPY);
 			}
 		));
-		builtins.emplace(createFunction(
+		builtins.push_back(createFunction(
 			"setimmutable",
 			3,
 			0,
@@ -327,7 +325,7 @@ std::map<YulName, BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _ev
 				_assembly.appendImmutableAssignment(identifier);
 			}
 		));
-		builtins.emplace(createFunction(
+		builtins.push_back(createFunction(
 			"loadimmutable",
 			1,
 			1,
@@ -361,9 +359,19 @@ EVMDialect::EVMDialect(langutil::EVMVersion _evmVersion, bool _objectAccess):
 	m_functions(createBuiltins(_evmVersion, _objectAccess)),
 	m_reserved(createReservedIdentifiers(_evmVersion))
 {
+	std::sort(m_functions.begin(), m_functions.end(), [](auto const& lhs, auto const& rhs) { return lhs.name.str() < rhs.name.str(); });
 }
 
-BuiltinFunctionForEVM const* EVMDialect::builtin(YulName _name) const
+std::optional<BuiltinHandle> EVMDialect::builtin(YulName _name) const
+{
+	static auto constexpr comparator = [](auto const& lhs, auto const& rhs) { return lhs.name.str() < rhs.str(); };
+	auto it = std::lower_bound(m_functions.begin(), m_functions.end(), _name, comparator);
+	if (it != m_functions.end() && it->name == _name)
+		return BuiltinHandle{static_cast<size_t>(std::distance(m_functions.begin(), it))};
+	return std::nullopt;
+}
+
+std::optional<VerbatimHandle> EVMDialect::verbatim(YulName _name) const
 {
 	if (m_objectAccess)
 	{
@@ -371,11 +379,7 @@ BuiltinFunctionForEVM const* EVMDialect::builtin(YulName _name) const
 		if (regex_match(_name.str(), match, verbatimPattern()))
 			return verbatimFunction(stoul(match[1]), stoul(match[2]));
 	}
-	auto it = m_functions.find(_name);
-	if (it != m_functions.end())
-		return &it->second;
-	else
-		return nullptr;
+	return std::nullopt;
 }
 
 bool EVMDialect::reservedIdentifier(YulName _name) const
@@ -424,11 +428,11 @@ SideEffects EVMDialect::sideEffectsOfInstruction(evmasm::Instruction _instructio
 	};
 }
 
-BuiltinFunctionForEVM const* EVMDialect::verbatimFunction(size_t _arguments, size_t _returnVariables) const
+VerbatimHandle EVMDialect::verbatimFunction(size_t _arguments, size_t _returnVariables) const
 {
 	std::pair<size_t, size_t> key{_arguments, _returnVariables};
-	std::shared_ptr<BuiltinFunctionForEVM const>& function = m_verbatimFunctions[key];
-	if (!function)
+	auto [it, emplaced] = m_verbatimFunctions.try_emplace(key);
+	if (emplaced)
 	{
 		BuiltinFunctionForEVM builtinFunction = createFunction(
 			"verbatim_" + std::to_string(_arguments) + "i_" + std::to_string(_returnVariables) + "o",
@@ -450,9 +454,22 @@ BuiltinFunctionForEVM const* EVMDialect::verbatimFunction(size_t _arguments, siz
 					_returnVariables
 				);
 			}
-		).second;
+		);
 		builtinFunction.isMSize = true;
-		function = std::make_shared<BuiltinFunctionForEVM const>(std::move(builtinFunction));
+		it->second = std::move(builtinFunction);
 	}
-	return function.get();
+	return VerbatimHandle{_arguments, _returnVariables};
+}
+
+BuiltinFunctionForEVM const& EVMDialect::builtinFunction(BuiltinHandle const& handle) const
+{
+	yulAssert(handle.id < m_functions.size());
+	return m_functions[handle.id];
+}
+
+BuiltinFunctionForEVM const& EVMDialect::verbatimFunction(VerbatimHandle const& handle) const
+{
+	auto it = m_verbatimFunctions.find(std::make_pair(handle.numArgs, handle.numRets));
+	yulAssert(it != m_verbatimFunctions.end());
+	return it->second;
 }

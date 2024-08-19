@@ -59,6 +59,8 @@ public:
 
 	std::string operator()(Literal const& _literal);
 	std::string operator()(Identifier const& _identifier);
+	std::string operator()(Builtin const& _builtin);
+	std::string operator()(Verbatim const& _builtin);
 	std::string operator()(ExpressionStatement const& _expr);
 	std::string operator()(Assignment const& _assignment);
 	std::string operator()(VariableDeclaration const& _variableDeclaration);

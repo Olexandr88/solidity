@@ -61,6 +61,11 @@ std::string AsmPrinter::operator()(Literal const& _literal)
 	return locationComment + escapeAndQuoteString(formattedValue);
 }
 
+std::string AsmPrinter::operator()(Builtin const& _builtin)
+{
+	return formatDebugData(_builtin) + m_dialect.builtinFunction(_builtin.handle).name.str();
+}
+
 std::string AsmPrinter::operator()(Identifier const& _identifier)
 {
 	yulAssert(!_identifier.name.empty(), "Invalid identifier.");
@@ -135,7 +140,7 @@ std::string AsmPrinter::operator()(FunctionDefinition const& _functionDefinition
 std::string AsmPrinter::operator()(FunctionCall const& _functionCall)
 {
 	std::string const locationComment = formatDebugData(_functionCall);
-	std::string const functionName = (*this)(_functionCall.functionName);
+	std::string const functionName = std::visit(*this, _functionCall.functionName);
 	return
 		locationComment +
 		functionName + "(" +

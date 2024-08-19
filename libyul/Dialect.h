@@ -21,13 +21,14 @@
 
 #pragma once
 
-#include <libyul/YulName.h>
+#include <libyul/Builtins.h>
 #include <libyul/ControlFlowSideEffects.h>
 #include <libyul/SideEffects.h>
+#include <libyul/YulName.h>
 
-#include <vector>
-#include <set>
 #include <optional>
+#include <set>
+#include <vector>
 
 namespace solidity::yul
 {
@@ -61,10 +62,14 @@ struct Dialect
 	Dialect& operator=(Dialect const&) = delete;
 
 	/// @returns the builtin function of the given name or a nullptr if it is not a builtin function.
-	virtual BuiltinFunction const* builtin(YulName /*_name*/) const { return nullptr; }
+	virtual std::optional<BuiltinHandle> builtin(YulName /*_name*/) const { return std::nullopt; }
+	virtual std::optional<VerbatimHandle> verbatim(YulName /*_name*/) const { return std::nullopt; }
+
+	virtual BuiltinFunction const& builtinFunction(BuiltinHandle const&) const;
+	virtual BuiltinFunction const& verbatimFunction(VerbatimHandle const&) const;
 
 	/// @returns true if the identifier is reserved. This includes the builtins too.
-	virtual bool reservedIdentifier(YulName _name) const { return builtin(_name) != nullptr; }
+	virtual bool reservedIdentifier(YulName _name) const { return builtin(_name).has_value(); }
 
 	virtual BuiltinFunction const* discardFunction() const { return nullptr; }
 	virtual BuiltinFunction const* equalityFunction() const { return nullptr; }
