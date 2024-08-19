@@ -22,7 +22,7 @@
 # (c) 2016-2021 solidity contributors.
 #------------------------------------------------------------------------------
 FROM gcr.io/oss-fuzz-base/base-clang:latest as base
-LABEL version="7"
+LABEL version="8"
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -69,22 +69,6 @@ RUN wget https://github.com/Kitware/CMake/releases/download/v3.21.2/cmake-3.21.2
     ./cmake-3.21.2-Linux-x86_64.sh --skip-license --prefix="/usr"
 
 FROM base AS libraries
-
-# Boost
-RUN set -ex; \
-    cd /usr/src; \
-    wget -q 'https://boostorg.jfrog.io/artifactory/main/release/1.74.0/source/boost_1_74_0.tar.bz2' -O boost.tar.bz2; \
-    test "$(sha256sum boost.tar.bz2)" = "83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff025e116b1  boost.tar.bz2" && \
-    tar -xf boost.tar.bz2; \
-    rm boost.tar.bz2; \
-    cd boost_1_74_0; \
-    CXXFLAGS="-stdlib=libc++ -pthread" LDFLAGS="-stdlib=libc++" ./bootstrap.sh --with-toolset=clang --prefix=/usr; \
-    ./b2 toolset=clang cxxflags="-stdlib=libc++ -pthread" linkflags="-stdlib=libc++ -pthread" headers; \
-    ./b2 toolset=clang cxxflags="-stdlib=libc++ -pthread" linkflags="-stdlib=libc++ -pthread" \
-        link=static variant=release runtime-link=static \
-        system filesystem unit_test_framework program_options \
-        install -j $(($(nproc)/2)); \
-    rm -rf /usr/src/boost_1_74_0
 
 # Z3
 RUN set -ex; \
@@ -140,15 +124,11 @@ RUN set -ex; \
 
 # EVMONE
 RUN set -ex; \
-	cd /usr/src; \
-	git clone --branch="v0.11.0" --recurse-submodules https://github.com/ethereum/evmone.git; \
-	cd evmone; \
-	mkdir build; \
-	cd build; \
-	CXX=clang++ cmake -G Ninja -DBUILD_SHARED_LIBS=OFF -DCMAKE_INSTALL_PREFIX="/usr" ..; \
-	ninja; \
-	ninja install/strip; \
-	rm -rf /usr/src/evmone
+    wget -O /usr/src/evmone.tar.gz https://github.com/ethereum/evmone/releases/download/v0.12.0/evmone-0.12.0-linux-x86_64.tar.gz; \
+    test "$(sha256sum /usr/src/evmone.tar.gz)" = "1c7b5eba0c8c3b3b2a7a05101e2d01a13a2f84b323989a29be66285dba4136ce  /usr/src/evmone.tar.gz"; \
+    cd /usr; \
+    tar -xf /usr/src/evmone.tar.gz; \
+    rm -rf /usr/src/evmone.tar.gz
 
 # gmp
 RUN set -ex; \
