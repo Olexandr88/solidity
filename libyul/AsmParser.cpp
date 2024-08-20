@@ -523,7 +523,7 @@ Expression Parser::parseExpression(bool _unlimitedLiteralArgument)
 				return parseCall(std::move(operation));
 			return std::move(_identifier);
 		},
-	 	[&](Builtin& _builtin) -> Expression
+		[&](Builtin& _builtin) -> Expression
 		{
 			if (currentToken() == Token::LParen)
 				return parseCall(std::move(operation));
@@ -539,9 +539,9 @@ Expression Parser::parseExpression(bool _unlimitedLiteralArgument)
 			if (currentToken() == Token::LParen)
 				return parseCall(std::move(operation));
 			fatalParserError(
-			   7104_error,
-			   nativeLocationOf(_verbatim),
-			   "Builtin function \"" + m_dialect.verbatimFunction(_verbatim.handle).name.str() + "\" must be called."
+				7104_error,
+				nativeLocationOf(_verbatim),
+				"Builtin function \"" + m_dialect.verbatimFunction(_verbatim.handle).name.str() + "\" must be called."
 			);
 			return std::move(_verbatim);
 		},
@@ -728,7 +728,7 @@ FunctionCall Parser::parseCall(std::variant<Literal, Identifier, Builtin, Verbat
 					return f.literalArgument(index).has_value();
 				return false;
 			};
-		 	FunctionCall ret;
+			FunctionCall ret;
 			ret.debugData = _builtin.debugData;
 			ret.functionName = std::move(_builtin);
 			return ret;

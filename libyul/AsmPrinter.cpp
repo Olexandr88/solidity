@@ -66,6 +66,11 @@ std::string AsmPrinter::operator()(Builtin const& _builtin)
 	return formatDebugData(_builtin) + m_dialect.builtinFunction(_builtin.handle).name.str();
 }
 
+std::string AsmPrinter::operator()(Verbatim const& _verbatim)
+{
+	return formatDebugData(_verbatim) + m_dialect.verbatimFunction(_verbatim.handle).name.str();
+}
+
 std::string AsmPrinter::operator()(Identifier const& _identifier)
 {
 	yulAssert(!_identifier.name.empty(), "Invalid identifier.");

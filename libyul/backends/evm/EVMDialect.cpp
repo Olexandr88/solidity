@@ -50,8 +50,8 @@ BuiltinFunctionForEVM createEVMFunction(
 )
 {
 	BuiltinFunctionForEVM f;
-    evmasm::InstructionInfo info = evmasm::instructionInfo(_instruction, _evmVersion);
-    f.name = YulName{_name};
+	evmasm::InstructionInfo info = evmasm::instructionInfo(_instruction, _evmVersion);
+	f.name = YulName{_name};
 	f.numParameters = static_cast<size_t>(info.args);
 	f.numReturns = static_cast<size_t>(info.ret);
 	f.sideEffects = EVMDialect::sideEffectsOfInstruction(_instruction);

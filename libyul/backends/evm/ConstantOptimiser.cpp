@@ -77,7 +77,7 @@ struct MiniEVMInterpreter
 	{
 		return std::visit(GenericVisitor{
 			[&](Builtin const& _builtin) {
-			    auto const& function = m_dialect.builtinFunction(_builtin.handle);
+				auto const& function = m_dialect.builtinFunction(_builtin.handle);
 				yulAssert(function.instruction, "Expected EVM instruction.");
 				return eval(*function.instruction, _funCall.arguments);
 			},
@@ -87,7 +87,7 @@ struct MiniEVMInterpreter
 				return eval(*function.instruction, _funCall.arguments);
 			},
 			[](Identifier const&) -> u256 { yulAssert(false, "Expected builtin function."); }
-	    }, _funCall.functionName);
+		}, _funCall.functionName);
 	}
 	u256 operator()(Literal const& _literal)
 	{
