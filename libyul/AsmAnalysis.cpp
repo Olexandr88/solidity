@@ -628,9 +628,13 @@ void AsmAnalyzer::expectValidIdentifier(YulName _identifier, SourceLocation cons
 bool AsmAnalyzer::validateInstructions(std::string const& _instructionIdentifier, langutil::SourceLocation const& _location)
 {
 	// NOTE: This function uses the default EVM version instead of the currently selected one.
-	auto const builtin = EVMDialect::strictAssemblyForEVM(EVMVersion{}).builtin(YulName(_instructionIdentifier));
-	if (builtin && builtin->instruction.has_value())
-		return validateInstructions(builtin->instruction.value(), _location);
+	auto const& defaultEVMDialect = EVMDialect::strictAssemblyForEVM(EVMVersion{});
+	auto const builtinHandle = defaultEVMDialect.builtin(YulName(_instructionIdentifier));
+	if (builtinHandle)
+	{
+		BuiltinFunctionForEVM const& builtin = defaultEVMDialect.builtinFunction(builtinHandle.value());
+		return builtin.instruction.has_value() && validateInstructions(builtin.instruction.value(), _location);
+	}
 	else
 		return false;
 }

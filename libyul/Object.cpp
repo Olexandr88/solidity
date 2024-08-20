@@ -67,7 +67,7 @@ std::string Object::toString(
 		"}";
 }
 
-Json Data::toJson() const
+Json Data::toJson(Dialect const&) const
 {
 	Json ret;
 	ret["nodeType"] = "YulData";
@@ -90,17 +90,17 @@ std::string ObjectDebugData::formatUseSrcComment() const
 	return "/// @use-src " + serializedSourceNames + "\n";
 }
 
-Json Object::toJson() const
+Json Object::toJson(Dialect const& _dialect) const
 {
 	yulAssert(hasCode(), "No code");
 
 	Json codeJson;
 	codeJson["nodeType"] = "YulCode";
-	codeJson["block"] = AsmJsonConverter(0 /* sourceIndex */)(code()->root());
+	codeJson["block"] = AsmJsonConverter(_dialect, 0 /* sourceIndex */)(code()->root());
 
 	Json subObjectsJson = Json::array();
 	for (std::shared_ptr<ObjectNode> const& subObject: subObjects)
-		subObjectsJson.emplace_back(subObject->toJson());
+		subObjectsJson.emplace_back(subObject->toJson(_dialect));
 
 	Json ret;
 	ret["nodeType"] = "YulObject";

@@ -723,15 +723,14 @@ FunctionCall Parser::parseCall(std::variant<Literal, Identifier, Builtin, Verbat
 		},
 		[&](Builtin& _builtin) -> FunctionCall
 		{
-			FunctionCall ret;
+			isUnlimitedLiteralArgument = [f=m_dialect.builtinFunction(_builtin.handle)](size_t index) {
+				if (index < f.literalArguments.size())
+					return f.literalArgument(index).has_value();
+				return false;
+			};
+		 	FunctionCall ret;
 			ret.debugData = _builtin.debugData;
 			ret.functionName = std::move(_builtin);
-			// todo isUnlimitedLitArg based on dialect builtin
-			/*auto const isUnlimitedLiteralArgument = [f=m_dialect.builtin(ret.functionName.name)](size_t const index) {
-				if (f && index < f->literalArguments.size())
-					return f->literalArgument(index).has_value();
-				return false;
-			};*/
 			return ret;
 		},
 		[&](Verbatim& _verbatim) -> FunctionCall

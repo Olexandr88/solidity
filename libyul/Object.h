@@ -57,7 +57,7 @@ struct ObjectNode
 		langutil::DebugInfoSelection const& _debugInfoSelection,
 		langutil::CharStreamProvider const* _soliditySourceProvider
 	) const = 0;
-	virtual Json toJson() const = 0;
+	virtual Json toJson(Dialect const& _dialect) const = 0;
 };
 
 /**
@@ -73,7 +73,7 @@ struct Data: public ObjectNode
 		langutil::DebugInfoSelection const& _debugInfoSelection,
 		langutil::CharStreamProvider const* _soliditySourceProvider
 	) const override;
-	Json toJson() const override;
+	Json toJson(Dialect const& _dialect) const override;
 };
 
 
@@ -97,7 +97,7 @@ public:
 		langutil::CharStreamProvider const* _soliditySourceProvider = nullptr
 	) const override;
 	/// @returns a compact JSON representation of the AST.
-	Json toJson() const override;
+	Json toJson(Dialect const& _dialect) const override;
 	/// @returns the set of names of data objects accessible from within the code of
 	/// this object, including the name of object itself
 	/// Handles all names containing dots as reserved identifiers, not accessible as data.

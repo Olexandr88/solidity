@@ -71,14 +71,14 @@ struct Dialect
 	/// @returns true if the identifier is reserved. This includes the builtins too.
 	virtual bool reservedIdentifier(YulName _name) const { return builtin(_name).has_value(); }
 
-	virtual BuiltinFunction const* discardFunction() const { return nullptr; }
-	virtual BuiltinFunction const* equalityFunction() const { return nullptr; }
-	virtual BuiltinFunction const* booleanNegationFunction() const { return nullptr; }
+	virtual std::optional<BuiltinHandle> discardFunction() const { return std::nullopt; }
+	virtual std::optional<BuiltinHandle> equalityFunction() const { return std::nullopt; }
+	virtual std::optional<BuiltinHandle> booleanNegationFunction() const { return std::nullopt; }
 
-	virtual BuiltinFunction const* memoryStoreFunction() const { return nullptr; }
-	virtual BuiltinFunction const* memoryLoadFunction() const { return nullptr; }
-	virtual BuiltinFunction const* storageStoreFunction() const { return nullptr; }
-	virtual BuiltinFunction const* storageLoadFunction() const { return nullptr; }
+	virtual std::optional<BuiltinHandle> memoryStoreFunction() const { return std::nullopt; }
+	virtual std::optional<BuiltinHandle> memoryLoadFunction() const { return std::nullopt; }
+	virtual std::optional<BuiltinHandle> storageStoreFunction() const { return std::nullopt; }
+	virtual std::optional<BuiltinHandle> storageLoadFunction() const { return std::nullopt; }
 	virtual YulName hashFunction() const { return YulName{}; }
 
 	Literal zeroLiteral() const;

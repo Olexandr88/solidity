@@ -32,6 +32,7 @@
 #include <libyul/backends/evm/AbstractAssembly.h>
 
 #include <regex>
+#include <utility>
 #include <vector>
 
 using namespace std::string_literals;
@@ -175,7 +176,7 @@ std::set<YulName> createReservedIdentifiers(langutil::EVMVersion _evmVersion)
 	return reserved;
 }
 
-std::vector<BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVersion, bool _objectAccess)
+std::vector<std::optional<BuiltinFunctionForEVM>> createBuiltins(langutil::EVMVersion _evmVersion, bool _objectAccess)
 {
 
 	// Exclude prevrandao as builtin for VMs before paris and difficulty for VMs after paris.
@@ -184,7 +185,7 @@ std::vector<BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVersi
 		return (_instrName == "prevrandao" && _evmVersion < langutil::EVMVersion::paris()) || (_instrName == "difficulty" && _evmVersion >= langutil::EVMVersion::paris());
 	};
 
-	std::vector<BuiltinFunctionForEVM> builtins;
+	std::vector<std::optional<BuiltinFunctionForEVM>> builtins;
 	for (auto const& instr: evmasm::c_instructions)
 	{
 		std::string name = toLower(instr.first);
@@ -200,147 +201,158 @@ std::vector<BuiltinFunctionForEVM> createBuiltins(langutil::EVMVersion _evmVersi
 			_evmVersion.hasOpcode(opcode) &&
 			!prevRandaoException(name)
 		)
-			builtins.push_back(createEVMFunction(_evmVersion, name, opcode));
+			builtins.emplace_back(createEVMFunction(_evmVersion, name, opcode));
+		else
+			builtins.emplace_back(std::nullopt);
 	}
 
-	if (_objectAccess)
+	auto const createIfObjectAccess = [_objectAccess](
+		std::string const& _name,
+		size_t _params,
+		size_t _returns,
+		SideEffects _sideEffects,
+		std::vector<std::optional<LiteralKind>> _literalArguments,
+		std::function<void(FunctionCall const&, AbstractAssembly&, BuiltinContext&)> _generateCode
+	) -> std::optional<BuiltinFunctionForEVM>
 	{
-		builtins.push_back(createFunction("linkersymbol", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+		if (!_objectAccess)
+			return std::nullopt;
+		return createFunction(_name, _params, _returns, _sideEffects, std::move(_literalArguments), std::move(_generateCode));
+	};
+
+	builtins.emplace_back(createIfObjectAccess("linkersymbol", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+		FunctionCall const& _call,
+		AbstractAssembly& _assembly,
+		BuiltinContext&
+	) {
+		yulAssert(_call.arguments.size() == 1, "");
+		Expression const& arg = _call.arguments.front();
+		_assembly.appendLinkerSymbol(formatLiteral(std::get<Literal>(arg)));
+	}));
+	builtins.emplace_back(createIfObjectAccess(
+		"memoryguard",
+		1,
+		1,
+		SideEffects{},
+		{LiteralKind::Number},
+		[](
 			FunctionCall const& _call,
 			AbstractAssembly& _assembly,
 			BuiltinContext&
 		) {
 			yulAssert(_call.arguments.size() == 1, "");
-			Expression const& arg = _call.arguments.front();
-			_assembly.appendLinkerSymbol(formatLiteral(std::get<Literal>(arg)));
-		}));
-
-		builtins.push_back(createFunction(
-			"memoryguard",
-			1,
-			1,
-			SideEffects{},
-			{LiteralKind::Number},
-			[](
-				FunctionCall const& _call,
-				AbstractAssembly& _assembly,
-				BuiltinContext&
-			) {
-				yulAssert(_call.arguments.size() == 1, "");
-				Literal const* literal = std::get_if<Literal>(&_call.arguments.front());
-				yulAssert(literal, "");
-				_assembly.appendConstant(literal->value.value());
-			})
-		);
-
-		builtins.push_back(createFunction("datasize", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+			Literal const* literal = std::get_if<Literal>(&_call.arguments.front());
+			yulAssert(literal, "");
+			_assembly.appendConstant(literal->value.value());
+		})
+	);
+	builtins.emplace_back(createIfObjectAccess("datasize", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+		FunctionCall const& _call,
+		AbstractAssembly& _assembly,
+		BuiltinContext& _context
+	) {
+		yulAssert(_context.currentObject, "No object available.");
+		yulAssert(_call.arguments.size() == 1, "");
+		Expression const& arg = _call.arguments.front();
+		YulName const dataName (formatLiteral(std::get<Literal>(arg)));
+		if (_context.currentObject->name == dataName.str())
+			_assembly.appendAssemblySize();
+		else
+		{
+		std::vector<size_t> subIdPath =
+				_context.subIDs.count(dataName.str()) == 0 ?
+					_context.currentObject->pathToSubObject(dataName.str()) :
+					std::vector<size_t>{_context.subIDs.at(dataName.str())};
+			yulAssert(!subIdPath.empty(), "Could not find assembly object <" + dataName.str() + ">.");
+			_assembly.appendDataSize(subIdPath);
+		}
+	}));
+	builtins.emplace_back(createIfObjectAccess("dataoffset", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+		FunctionCall const& _call,
+		AbstractAssembly& _assembly,
+		BuiltinContext& _context
+	) {
+		yulAssert(_context.currentObject, "No object available.");
+		yulAssert(_call.arguments.size() == 1, "");
+		Expression const& arg = _call.arguments.front();
+		YulName const dataName (formatLiteral(std::get<Literal>(arg)));
+		if (_context.currentObject->name == dataName.str())
+			_assembly.appendConstant(0);
+		else
+		{
+		std::vector<size_t> subIdPath =
+				_context.subIDs.count(dataName.str()) == 0 ?
+					_context.currentObject->pathToSubObject(dataName.str()) :
+					std::vector<size_t>{_context.subIDs.at(dataName.str())};
+			yulAssert(!subIdPath.empty(), "Could not find assembly object <" + dataName.str() + ">.");
+			_assembly.appendDataOffset(subIdPath);
+		}
+	}));
+	builtins.emplace_back(createIfObjectAccess(
+		"datacopy",
+		3,
+		0,
+		SideEffects{
+			false,               // movable
+			true,                // movableApartFromEffects
+			false,               // canBeRemoved
+			false,               // canBeRemovedIfNotMSize
+			true,                // cannotLoop
+			SideEffects::None,   // otherState
+			SideEffects::None,   // storage
+			SideEffects::Write,  // memory
+			SideEffects::None    // transientStorage
+		},
+		{},
+		[](
+			FunctionCall const&,
+			AbstractAssembly& _assembly,
+			BuiltinContext&
+		) {
+			_assembly.appendInstruction(evmasm::Instruction::CODECOPY);
+		}
+	));
+	builtins.emplace_back(createIfObjectAccess(
+		"setimmutable",
+		3,
+		0,
+		SideEffects{
+			false,               // movable
+			false,               // movableApartFromEffects
+			false,               // canBeRemoved
+			false,               // canBeRemovedIfNotMSize
+			true,                // cannotLoop
+			SideEffects::None,   // otherState
+			SideEffects::None,   // storage
+			SideEffects::Write,  // memory
+			SideEffects::None    // transientStorage
+		},
+		{std::nullopt, LiteralKind::String, std::nullopt},
+		[](
 			FunctionCall const& _call,
 			AbstractAssembly& _assembly,
-			BuiltinContext& _context
+			BuiltinContext&
 		) {
-			yulAssert(_context.currentObject, "No object available.");
-			yulAssert(_call.arguments.size() == 1, "");
-			Expression const& arg = _call.arguments.front();
-			YulName const dataName (formatLiteral(std::get<Literal>(arg)));
-			if (_context.currentObject->name == dataName.str())
-				_assembly.appendAssemblySize();
-			else
-			{
-			std::vector<size_t> subIdPath =
-					_context.subIDs.count(dataName.str()) == 0 ?
-						_context.currentObject->pathToSubObject(dataName.str()) :
-						std::vector<size_t>{_context.subIDs.at(dataName.str())};
-				yulAssert(!subIdPath.empty(), "Could not find assembly object <" + dataName.str() + ">.");
-				_assembly.appendDataSize(subIdPath);
-			}
-		}));
-		builtins.push_back(createFunction("dataoffset", 1, 1, SideEffects{}, {LiteralKind::String}, [](
+			yulAssert(_call.arguments.size() == 3, "");
+			auto const identifier = (formatLiteral(std::get<Literal>(_call.arguments[1])));
+			_assembly.appendImmutableAssignment(identifier);
+		}
+	));
+	builtins.emplace_back(createIfObjectAccess(
+		"loadimmutable",
+		1,
+		1,
+		SideEffects{},
+		{LiteralKind::String},
+		[](
 			FunctionCall const& _call,
 			AbstractAssembly& _assembly,
-			BuiltinContext& _context
+			BuiltinContext&
 		) {
-			yulAssert(_context.currentObject, "No object available.");
 			yulAssert(_call.arguments.size() == 1, "");
-			Expression const& arg = _call.arguments.front();
-			YulName const dataName (formatLiteral(std::get<Literal>(arg)));
-			if (_context.currentObject->name == dataName.str())
-				_assembly.appendConstant(0);
-			else
-			{
-			std::vector<size_t> subIdPath =
-					_context.subIDs.count(dataName.str()) == 0 ?
-						_context.currentObject->pathToSubObject(dataName.str()) :
-						std::vector<size_t>{_context.subIDs.at(dataName.str())};
-				yulAssert(!subIdPath.empty(), "Could not find assembly object <" + dataName.str() + ">.");
-				_assembly.appendDataOffset(subIdPath);
-			}
-		}));
-		builtins.push_back(createFunction(
-			"datacopy",
-			3,
-			0,
-			SideEffects{
-				false,               // movable
-				true,                // movableApartFromEffects
-				false,               // canBeRemoved
-				false,               // canBeRemovedIfNotMSize
-				true,                // cannotLoop
-				SideEffects::None,   // otherState
-				SideEffects::None,   // storage
-				SideEffects::Write,  // memory
-				SideEffects::None    // transientStorage
-			},
-			{},
-			[](
-				FunctionCall const&,
-				AbstractAssembly& _assembly,
-				BuiltinContext&
-			) {
-				_assembly.appendInstruction(evmasm::Instruction::CODECOPY);
-			}
-		));
-		builtins.push_back(createFunction(
-			"setimmutable",
-			3,
-			0,
-			SideEffects{
-				false,               // movable
-				false,               // movableApartFromEffects
-				false,               // canBeRemoved
-				false,               // canBeRemovedIfNotMSize
-				true,                // cannotLoop
-				SideEffects::None,   // otherState
-				SideEffects::None,   // storage
-				SideEffects::Write,  // memory
-				SideEffects::None    // transientStorage
-			},
-			{std::nullopt, LiteralKind::String, std::nullopt},
-			[](
-				FunctionCall const& _call,
-				AbstractAssembly& _assembly,
-				BuiltinContext&
-			) {
-				yulAssert(_call.arguments.size() == 3, "");
-				auto const identifier = (formatLiteral(std::get<Literal>(_call.arguments[1])));
-				_assembly.appendImmutableAssignment(identifier);
-			}
-		));
-		builtins.push_back(createFunction(
-			"loadimmutable",
-			1,
-			1,
-			SideEffects{},
-			{LiteralKind::String},
-			[](
-				FunctionCall const& _call,
-				AbstractAssembly& _assembly,
-				BuiltinContext&
-			) {
-				yulAssert(_call.arguments.size() == 1, "");
-				_assembly.appendImmutable(formatLiteral(std::get<Literal>(_call.arguments.front())));
-			}
-		));
-	}
+			_assembly.appendImmutable(formatLiteral(std::get<Literal>(_call.arguments.front())));
+		}
+	));
 	return builtins;
 }
 
@@ -359,14 +371,33 @@ EVMDialect::EVMDialect(langutil::EVMVersion _evmVersion, bool _objectAccess):
 	m_functions(createBuiltins(_evmVersion, _objectAccess)),
 	m_reserved(createReservedIdentifiers(_evmVersion))
 {
-	std::sort(m_functions.begin(), m_functions.end(), [](auto const& lhs, auto const& rhs) { return lhs.name.str() < rhs.name.str(); });
+	auto const assertBuiltin = [this](YulName const& name)
+	{
+		std::optional<BuiltinHandle> const handle = builtin(name);
+		yulAssert(handle.has_value());
+		return *handle;
+	};
+	m_handles.add = assertBuiltin("add"_yulname);
+	m_handles.exp = assertBuiltin("exp"_yulname);
+	m_handles.mul = assertBuiltin("mul"_yulname);
+	m_handles.not_ = assertBuiltin("not"_yulname);
+	m_handles.shl = assertBuiltin("shl"_yulname);
+	m_handles.sub = assertBuiltin("sub"_yulname);
+
+	m_discardFunction = builtin("pop"_yulname);
+	m_equalityFunction = builtin("eq"_yulname);
+	m_booleanNegationFunction = builtin("iszero"_yulname);
+	m_memoryStoreFunction = builtin("mstore"_yulname);
+	m_memoryLoadFunction = builtin("mload"_yulname);
+	m_storageStoreFunction = builtin("sstore"_yulname);
+	m_storageLoadFunction = builtin("sload"_yulname);
 }
 
 std::optional<BuiltinHandle> EVMDialect::builtin(YulName _name) const
 {
 	static auto constexpr comparator = [](auto const& lhs, auto const& rhs) { return lhs.name.str() < rhs.str(); };
-	auto it = std::lower_bound(m_functions.begin(), m_functions.end(), _name, comparator);
-	if (it != m_functions.end() && it->name == _name)
+	auto it = std::find_if(m_functions.begin(), m_functions.end(), [&_name](auto const& builtin) { return builtin && builtin.value().name == _name; });
+	if (it != m_functions.end() && *it && it->value().name == _name)
 		return BuiltinHandle{static_cast<size_t>(std::distance(m_functions.begin(), it))};
 	return std::nullopt;
 }
@@ -464,7 +495,9 @@ VerbatimHandle EVMDialect::verbatimFunction(size_t _arguments, size_t _returnVar
 BuiltinFunctionForEVM const& EVMDialect::builtinFunction(BuiltinHandle const& handle) const
 {
 	yulAssert(handle.id < m_functions.size());
-	return m_functions[handle.id];
+	auto const& maybeBuiltin = m_functions[handle.id];
+	yulAssert(maybeBuiltin.has_value());
+	return *maybeBuiltin;
 }
 
 BuiltinFunctionForEVM const& EVMDialect::verbatimFunction(VerbatimHandle const& handle) const
