@@ -30,6 +30,8 @@
 namespace solidity::yul
 {
 
+struct Dialect;
+
 std::string reindent(std::string const& _code);
 
 LiteralValue valueOfNumberLiteral(std::string_view _literal);
@@ -82,5 +84,7 @@ struct SwitchCaseCompareByLiteralValue
 {
 	bool operator()(Case const* _lhsCase, Case const* _rhsCase) const;
 };
+
+std::string_view resolveFunctionName(FunctionName const& _functionName, Dialect const& _dialect);
 
 }

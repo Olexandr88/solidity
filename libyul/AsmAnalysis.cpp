@@ -131,6 +131,16 @@ size_t AsmAnalyzer::operator()(Literal const& _literal)
 	return 1;
 }
 
+size_t AsmAnalyzer::operator()(Builtin const&)
+{
+	yulAssert(false, "Should not be called for builtins");
+}
+
+size_t AsmAnalyzer::operator()(Verbatim const&)
+{
+	yulAssert(false, "Should not be called for builtins");
+}
+
 size_t AsmAnalyzer::operator()(Identifier const& _identifier)
 {
 	yulAssert(!_identifier.name.empty(), "");
@@ -350,21 +360,21 @@ size_t AsmAnalyzer::operator()(FunctionCall const& _funCall)
 			m_sideEffects += function.sideEffects;
 		},
 		[&](Identifier const& _identifier)
-		{ 
+		{
 			yulAssert(!_identifier.name.empty(), "");
 			if (m_currentScope->lookup(_identifier.name, GenericVisitor{
 				[&](Scope::Variable const&)
 				{
-				   m_errorReporter.typeError(
-					   4202_error,
-					   nativeLocationOf(_funCall.functionName),
-					   "Attempt to call variable instead of function."
-				   );
+					m_errorReporter.typeError(
+						4202_error,
+						nativeLocationOf(_funCall.functionName),
+						"Attempt to call variable instead of function."
+					);
 				},
 				[&](Scope::Function const& _fun)
 				{
-				   numParameters = _fun.numArguments;
-				   numReturns = _fun.numReturns;
+					numParameters = _fun.numArguments;
+					numReturns = _fun.numReturns;
 				}
 			}))
 			{
@@ -394,10 +404,12 @@ size_t AsmAnalyzer::operator()(FunctionCall const& _funCall)
 		m_errorReporter.typeError(
 			7000_error,
 			nativeLocationOf(_funCall.functionName),
-			"Function \"" + _funCall.functionName.name.str() + "\" expects " +
-			std::to_string(*numParameters) +
-			" arguments but got " +
-			std::to_string(_funCall.arguments.size()) + "."
+			fmt::format(
+				"Function \"{}\" expects {} arguments but got {}.",
+				resolveFunctionName(_funCall.functionName, m_dialect),
+				*numParameters,
+				_funCall.arguments.size()
+			)
 		);
 
 	size_t numArgs{0};
@@ -424,7 +436,7 @@ size_t AsmAnalyzer::operator()(FunctionCall const& _funCall)
 				);
 			else if (*literalArgumentKind == LiteralKind::String)
 			{
-				std::string functionName = _funCall.functionName.name.str();
+				std::string_view functionName = resolveFunctionName(_funCall.functionName, m_dialect);
 				if (functionName == "datasize" || functionName == "dataoffset")
 				{
 					auto const& argumentAsLiteral = std::get<Literal>(arg);
@@ -637,7 +649,7 @@ void AsmAnalyzer::expectValidIdentifier(YulName _identifier, SourceLocation cons
 			"\"" + _identifier.str() + "\" is not a valid identifier (contains consecutive dots)."
 		);
 
-	if (m_dialect.reservedIdentifier(_identifier))
+	if (m_dialect.reservedIdentifier(_identifier.str()))
 		m_errorReporter.declarationError(
 			5017_error,
 			_location,
@@ -645,11 +657,11 @@ void AsmAnalyzer::expectValidIdentifier(YulName _identifier, SourceLocation cons
 		);
 }
 
-bool AsmAnalyzer::validateInstructions(std::string const& _instructionIdentifier, langutil::SourceLocation const& _location)
+bool AsmAnalyzer::validateInstructions(std::string_view _instructionIdentifier, langutil::SourceLocation const& _location)
 {
 	// NOTE: This function uses the default EVM version instead of the currently selected one.
 	auto const& defaultEVMDialect = EVMDialect::strictAssemblyForEVM(EVMVersion{});
-	auto const builtinHandle = defaultEVMDialect.builtin(YulName(_instructionIdentifier));
+	auto const builtinHandle = defaultEVMDialect.builtin(_instructionIdentifier);
 	if (builtinHandle)
 	{
 		BuiltinFunctionForEVM const& builtin = defaultEVMDialect.builtinFunction(builtinHandle.value());
@@ -736,5 +748,5 @@ bool AsmAnalyzer::validateInstructions(evmasm::Instruction _instr, SourceLocatio
 
 bool AsmAnalyzer::validateInstructions(FunctionCall const& _functionCall)
 {
-	return validateInstructions(_functionCall.functionName.name.str(), nativeLocationOf(_functionCall.functionName));
+	return validateInstructions(resolveFunctionName(_functionCall.functionName, m_dialect), nativeLocationOf(_functionCall.functionName));
 }

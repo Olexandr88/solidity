@@ -37,6 +37,8 @@
 namespace solidity::yul
 {
 
+struct Dialect;
+
 /**
  * Converts a parsed Yul AST into readable string representation.
  * Ignores source locations.
@@ -45,10 +47,12 @@ class AsmPrinter
 {
 public:
 	explicit AsmPrinter(
+		Dialect const& _dialect,
 		std::optional<std::map<unsigned, std::shared_ptr<std::string const>>> _sourceIndexToName = {},
 		langutil::DebugInfoSelection const& _debugInfoSelection = langutil::DebugInfoSelection::Default(),
 		langutil::CharStreamProvider const* _soliditySourceProvider = nullptr
 	):
+		m_dialect(_dialect),
 		m_debugInfoSelection(_debugInfoSelection),
 		m_soliditySourceProvider(_soliditySourceProvider)
 	{
@@ -91,6 +95,7 @@ private:
 		return formatDebugData(_node.debugData, !isExpression);
 	}
 
+	Dialect const& m_dialect;
 	std::map<std::string, unsigned> m_nameToSourceIndex;
 	langutil::SourceLocation m_lastLocation = {};
 	langutil::DebugInfoSelection m_debugInfoSelection = {};

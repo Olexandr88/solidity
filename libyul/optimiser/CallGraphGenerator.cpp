@@ -80,8 +80,10 @@ CallGraph CallGraphGenerator::callGraph(Block const& _ast)
 void CallGraphGenerator::operator()(FunctionCall const& _functionCall)
 {
 	auto& functionCalls = m_callGraph.functionCalls[m_currentFunction];
-	if (!util::contains(functionCalls, _functionCall.functionName.name))
-		functionCalls.emplace_back(_functionCall.functionName.name);
+	yulAssert(!isBuiltinFunctionCall(_functionCall));
+	auto const& name = std::get<Identifier>(_functionCall.functionName).name;
+	if (!util::contains(functionCalls, name))
+		functionCalls.emplace_back(name);
 	ASTWalker::operator()(_functionCall);
 }
 

@@ -22,6 +22,7 @@
 #include <libyul/Utilities.h>
 
 #include <libyul/AST.h>
+#include <libyul/Dialect.h>
 #include <libyul/Exceptions.h>
 
 #include <libsolutil/CommonData.h>
@@ -237,3 +238,15 @@ bool SwitchCaseCompareByLiteralValue::operator()(Case const* _lhs, Case const* _
 	yulAssert(_lhs && _rhs, "");
 	return Less<Literal*>{}(_lhs->value.get(), _rhs->value.get());
 }
+
+std::string_view yul::resolveFunctionName(FunctionName const& _functionName, Dialect const& _dialect)
+{
+	if (std::holds_alternative<Identifier>(_functionName))
+		return std::get<Identifier>(_functionName).name.str();
+	else if (std::holds_alternative<Builtin>(_functionName))
+		return _dialect.builtinFunction(std::get<Builtin>(_functionName).handle).name;
+	else if (std::holds_alternative<Verbatim>(_functionName))
+		return _dialect.verbatimFunction(std::get<Verbatim>(_functionName).handle).name;
+	yulAssert(false);
+}
+
