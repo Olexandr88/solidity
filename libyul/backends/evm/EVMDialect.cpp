@@ -51,7 +51,7 @@ BuiltinFunctionForEVM createEVMFunction(
 {
 	BuiltinFunctionForEVM f;
 	evmasm::InstructionInfo info = evmasm::instructionInfo(_instruction, _evmVersion);
-	f.name = YulName{_name};
+	f.name = _name;
 	f.numParameters = static_cast<size_t>(info.args);
 	f.numReturns = static_cast<size_t>(info.ret);
 	f.sideEffects = EVMDialect::sideEffectsOfInstruction(_instruction);
@@ -94,7 +94,7 @@ BuiltinFunctionForEVM createFunction(
 	yulAssert(_literalArguments.size() == _params || _literalArguments.empty(), "");
 
 	BuiltinFunctionForEVM f;
-	f.name = YulName(_name);
+	f.name = _name;
 	f.numParameters = _params;
 	f.numReturns = _returns;
 	f.sideEffects = _sideEffects;
@@ -105,7 +105,7 @@ BuiltinFunctionForEVM createFunction(
 	return f;
 }
 
-std::set<YulName> createReservedIdentifiers(langutil::EVMVersion _evmVersion)
+std::set<std::string, std::less<>> createReservedIdentifiers(langutil::EVMVersion _evmVersion)
 {
 	// TODO remove this in 0.9.0. We allow creating functions or identifiers in Yul with the name
 	// basefee for VMs before london.
@@ -151,7 +151,7 @@ std::set<YulName> createReservedIdentifiers(langutil::EVMVersion _evmVersion)
 			(_instr == evmasm::Instruction::TSTORE || _instr == evmasm::Instruction::TLOAD);
 	};
 
-	std::set<YulName> reserved;
+	std::set<std::string, std::less<>> reserved;
 	for (auto const& instr: evmasm::c_instructions)
 	{
 		std::string name = toLower(instr.first);
@@ -165,13 +165,13 @@ std::set<YulName> createReservedIdentifiers(langutil::EVMVersion _evmVersion)
 		)
 			reserved.emplace(name);
 	}
-	reserved += std::vector<YulName>{
-		"linkersymbol"_yulname,
-		"datasize"_yulname,
-		"dataoffset"_yulname,
-		"datacopy"_yulname,
-		"setimmutable"_yulname,
-		"loadimmutable"_yulname,
+	reserved += std::vector<std::string>{
+		"linkersymbol",
+		"datasize",
+		"dataoffset",
+		"datacopy",
+		"setimmutable",
+		"loadimmutable",
 	};
 	return reserved;
 }
@@ -371,29 +371,29 @@ EVMDialect::EVMDialect(langutil::EVMVersion _evmVersion, bool _objectAccess):
 	m_functions(createBuiltins(_evmVersion, _objectAccess)),
 	m_reserved(createReservedIdentifiers(_evmVersion))
 {
-	auto const assertBuiltin = [this](YulName const& name)
+	auto const assertBuiltin = [this](std::string_view name)
 	{
 		std::optional<BuiltinHandle> const handle = builtin(name);
 		yulAssert(handle.has_value());
 		return *handle;
 	};
-	m_handles.add = assertBuiltin("add"_yulname);
-	m_handles.exp = assertBuiltin("exp"_yulname);
-	m_handles.mul = assertBuiltin("mul"_yulname);
-	m_handles.not_ = assertBuiltin("not"_yulname);
-	m_handles.shl = assertBuiltin("shl"_yulname);
-	m_handles.sub = assertBuiltin("sub"_yulname);
+	m_handles.add = assertBuiltin("add");
+	m_handles.exp = assertBuiltin("exp");
+	m_handles.mul = assertBuiltin("mul");
+	m_handles.not_ = assertBuiltin("not");
+	m_handles.shl = assertBuiltin("shl");
+	m_handles.sub = assertBuiltin("sub");
 
-	m_discardFunction = builtin("pop"_yulname);
-	m_equalityFunction = builtin("eq"_yulname);
-	m_booleanNegationFunction = builtin("iszero"_yulname);
-	m_memoryStoreFunction = builtin("mstore"_yulname);
-	m_memoryLoadFunction = builtin("mload"_yulname);
-	m_storageStoreFunction = builtin("sstore"_yulname);
-	m_storageLoadFunction = builtin("sload"_yulname);
+	m_discardFunction = builtin("pop");
+	m_equalityFunction = builtin("eq");
+	m_booleanNegationFunction = builtin("iszero");
+	m_memoryStoreFunction = builtin("mstore");
+	m_memoryLoadFunction = builtin("mload");
+	m_storageStoreFunction = builtin("sstore");
+	m_storageLoadFunction = builtin("sload");
 }
 
-std::optional<BuiltinHandle> EVMDialect::builtin(YulName _name) const
+std::optional<BuiltinHandle> EVMDialect::builtin(std::string_view _name) const
 {
 	static auto constexpr comparator = [](auto const& lhs, auto const& rhs) { return lhs.name.str() < rhs.str(); };
 	auto it = std::find_if(m_functions.begin(), m_functions.end(), [&_name](auto const& builtin) { return builtin && builtin.value().name == _name; });
@@ -402,21 +402,22 @@ std::optional<BuiltinHandle> EVMDialect::builtin(YulName _name) const
 	return std::nullopt;
 }
 
-std::optional<VerbatimHandle> EVMDialect::verbatim(YulName _name) const
+std::optional<VerbatimHandle> EVMDialect::verbatim(std::string_view _name) const
 {
 	if (m_objectAccess)
 	{
 		std::smatch match;
-		if (regex_match(_name.str(), match, verbatimPattern()))
+		std::string name(_name);
+		if (regex_match(name, match, verbatimPattern()))
 			return verbatimFunction(stoul(match[1]), stoul(match[2]));
 	}
 	return std::nullopt;
 }
 
-bool EVMDialect::reservedIdentifier(YulName _name) const
+bool EVMDialect::reservedIdentifier(std::string_view _name) const
 {
 	if (m_objectAccess)
-		if (_name.str().substr(0, "verbatim"s.size()) == "verbatim")
+		if (_name.substr(0, "verbatim"s.size()) == "verbatim")
 			return true;
 	return m_reserved.count(_name) != 0;
 }

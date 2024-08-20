@@ -76,14 +76,14 @@ Json AsmJsonConverter::operator()(Literal const& _node) const
 Json AsmJsonConverter::operator()(Verbatim const& _node) const
 {
 	Json ret = createAstNode(originLocationOf(_node), nativeLocationOf(_node), "YulIdentifier");
-	ret["name"] = m_dialect.verbatimFunction(_node.handle).name.str();
+	ret["name"] = m_dialect.verbatimFunction(_node.handle).name;
 	return ret;
 }
 
 Json AsmJsonConverter::operator()(Builtin const& _node) const
 {
 	Json ret = createAstNode(originLocationOf(_node), nativeLocationOf(_node), "YulIdentifier");
-	ret["name"] = m_dialect.builtinFunction(_node.handle).name.str();
+	ret["name"] = m_dialect.builtinFunction(_node.handle).name;
 	return ret;
 }
 

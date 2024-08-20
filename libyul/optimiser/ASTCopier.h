@@ -41,6 +41,8 @@ public:
 	virtual Expression operator()(Literal const& _literal) = 0;
 	virtual Expression operator()(Identifier const& _identifier) = 0;
 	virtual Expression operator()(FunctionCall const&) = 0;
+	virtual Expression operator()(Builtin const&) = 0;
+	virtual Expression operator()(Verbatim const&) = 0;
 };
 
 class StatementCopier
@@ -71,6 +73,8 @@ public:
 	Expression operator()(Literal const& _literal) override;
 	Expression operator()(Identifier const& _identifier) override;
 	Expression operator()(FunctionCall const&) override;
+	Expression operator()(Builtin const& _builtin) override;
+	Expression operator()(Verbatim const& _verbatim) override;
 	Statement operator()(ExpressionStatement const& _statement) override;
 	Statement operator()(Assignment const& _assignment) override;
 	Statement operator()(VariableDeclaration const& _varDecl) override;
@@ -99,6 +103,9 @@ protected:
 
 	Case translate(Case const& _case);
 	virtual Identifier translate(Identifier const& _identifier);
+	FunctionName translate(FunctionName const& _functionName);
+	Builtin translate(Builtin const& _builtin);
+	Verbatim translate(Verbatim const& _verbatim);
 	Literal translate(Literal const& _literal);
 	NameWithDebugData translate(NameWithDebugData const& _typedName);
 

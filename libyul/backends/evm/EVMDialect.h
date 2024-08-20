@@ -77,13 +77,13 @@ struct EVMDialect: public Dialect
 	EVMDialect(langutil::EVMVersion _evmVersion, bool _objectAccess);
 
 	/// @returns the builtin function of the given name or a nullptr if it is not a builtin function.
-	std::optional<BuiltinHandle> builtin(YulName _name) const override;
-	std::optional<VerbatimHandle> verbatim(YulName name) const override;
+	std::optional<BuiltinHandle> builtin(std::string_view _name) const override;
+	std::optional<VerbatimHandle> verbatim(std::string_view _name) const override;
 
 	BuiltinFunctionForEVM const& builtinFunction(BuiltinHandle const& handle) const override;
 	BuiltinFunctionForEVM const& verbatimFunction(VerbatimHandle const&) const override;
 	/// @returns true if the identifier is reserved. This includes the builtins too.
-	bool reservedIdentifier(YulName _name) const override;
+	bool reservedIdentifier(std::string_view _name) const override;
 
 	std::optional<BuiltinHandle> discardFunction() const override { return m_discardFunction; }
 	std::optional<BuiltinHandle> equalityFunction() const override { return m_equalityFunction; }
@@ -112,7 +112,7 @@ protected:
 	langutil::EVMVersion const m_evmVersion;
 	std::vector<std::optional<BuiltinFunctionForEVM>> m_functions;
 	std::map<std::pair<size_t, size_t>, BuiltinFunctionForEVM> mutable m_verbatimFunctions;
-	std::set<YulName> m_reserved;
+	std::set<std::string, std::less<>> m_reserved;
 
 	Handles m_handles{};
 	std::optional<BuiltinHandle> m_discardFunction;

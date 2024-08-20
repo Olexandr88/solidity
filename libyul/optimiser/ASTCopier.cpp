@@ -66,6 +66,16 @@ Expression ASTCopier::operator()(Identifier const& _identifier)
 	return translate(_identifier);
 }
 
+Expression ASTCopier::operator()(Builtin const& _builtin)
+{
+	return translate(_builtin);
+}
+
+Expression ASTCopier::operator()(Verbatim const& _verbatim)
+{
+	return translate(_verbatim);
+}
+
 Expression ASTCopier::operator()(Literal const& _literal)
 {
 	return translate(_literal);
@@ -153,9 +163,25 @@ Case ASTCopier::translate(Case const& _case)
 	return Case{_case.debugData, translate(_case.value), translate(_case.body)};
 }
 
+FunctionName ASTCopier::translate(FunctionName const& _functionName)
+{
+	auto visitor = [this](auto const& name) -> FunctionName { return translate(name); };
+	return std::visit(visitor, _functionName);
+}
+
 Identifier ASTCopier::translate(Identifier const& _identifier)
 {
 	return Identifier{_identifier.debugData, translateIdentifier(_identifier.name)};
+}
+
+Builtin ASTCopier::translate(Builtin const& _builtin)
+{
+	return _builtin;
+}
+
+Verbatim ASTCopier::translate(Verbatim const& _verbatim)
+{
+	return _verbatim;
 }
 
 Literal ASTCopier::translate(Literal const& _literal)

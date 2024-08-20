@@ -63,12 +63,12 @@ std::string AsmPrinter::operator()(Literal const& _literal)
 
 std::string AsmPrinter::operator()(Builtin const& _builtin)
 {
-	return formatDebugData(_builtin) + m_dialect.builtinFunction(_builtin.handle).name.str();
+	return formatDebugData(_builtin) + m_dialect.builtinFunction(_builtin.handle).name;
 }
 
 std::string AsmPrinter::operator()(Verbatim const& _verbatim)
 {
-	return formatDebugData(_verbatim) + m_dialect.verbatimFunction(_verbatim.handle).name.str();
+	return formatDebugData(_verbatim) + m_dialect.verbatimFunction(_verbatim.handle).name;
 }
 
 std::string AsmPrinter::operator()(Identifier const& _identifier)

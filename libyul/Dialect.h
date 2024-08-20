@@ -39,7 +39,7 @@ struct Literal;
 
 struct BuiltinFunction
 {
-	YulName name;
+	std::string name;
 	size_t numParameters;
 	size_t numReturns;
 	SideEffects sideEffects;
@@ -62,14 +62,14 @@ struct Dialect
 	Dialect& operator=(Dialect const&) = delete;
 
 	/// @returns the builtin function of the given name or a nullptr if it is not a builtin function.
-	virtual std::optional<BuiltinHandle> builtin(YulName /*_name*/) const { return std::nullopt; }
-	virtual std::optional<VerbatimHandle> verbatim(YulName /*_name*/) const { return std::nullopt; }
+	virtual std::optional<BuiltinHandle> builtin(std::string_view /*_name*/) const { return std::nullopt; }
+	virtual std::optional<VerbatimHandle> verbatim(std::string_view /*_name*/) const { return std::nullopt; }
 
 	virtual BuiltinFunction const& builtinFunction(BuiltinHandle const&) const;
 	virtual BuiltinFunction const& verbatimFunction(VerbatimHandle const&) const;
 
 	/// @returns true if the identifier is reserved. This includes the builtins too.
-	virtual bool reservedIdentifier(YulName _name) const { return builtin(_name).has_value(); }
+	virtual bool reservedIdentifier(std::string_view _name) const { return builtin(_name).has_value(); }
 
 	virtual std::optional<BuiltinHandle> discardFunction() const { return std::nullopt; }
 	virtual std::optional<BuiltinHandle> equalityFunction() const { return std::nullopt; }

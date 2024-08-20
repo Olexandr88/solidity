@@ -434,9 +434,9 @@ Statement Parser::parseStatement()
 			{
 				std::string name;
 				if (std::holds_alternative<Builtin>(elementary))
-					name = m_dialect.builtinFunction(std::get<Builtin>(elementary).handle).name.str();
+					name = m_dialect.builtinFunction(std::get<Builtin>(elementary).handle).name;
 				else
-					name = m_dialect.verbatimFunction(std::get<Verbatim>(elementary).handle).name.str();
+					name = m_dialect.verbatimFunction(std::get<Verbatim>(elementary).handle).name;
 				fatalParserError(6272_error, "Cannot assign to builtin function \"" + name + "\".");
 			}
 
@@ -530,7 +530,7 @@ Expression Parser::parseExpression(bool _unlimitedLiteralArgument)
 			fatalParserError(
 				7104_error,
 				nativeLocationOf(_builtin),
-				"Builtin function \"" + m_dialect.builtinFunction(_builtin.handle).name.str() + "\" must be called."
+				"Builtin function \"" + m_dialect.builtinFunction(_builtin.handle).name + "\" must be called."
 			);
 			return std::move(_builtin);
 		},
@@ -541,7 +541,7 @@ Expression Parser::parseExpression(bool _unlimitedLiteralArgument)
 			fatalParserError(
 				7104_error,
 				nativeLocationOf(_verbatim),
-				"Builtin function \"" + m_dialect.verbatimFunction(_verbatim.handle).name.str() + "\" must be called."
+				"Builtin function \"" + m_dialect.verbatimFunction(_verbatim.handle).name + "\" must be called."
 			);
 			return std::move(_verbatim);
 		},
@@ -559,13 +559,13 @@ std::variant<Literal, Identifier, Builtin, Verbatim> Parser::parseLiteralOrIdent
 	{
 	case Token::Identifier:
 	{
-		if (auto builtinHandle = m_dialect.builtin(YulString(currentLiteral())))
+		if (auto builtinHandle = m_dialect.builtin(currentLiteral()))
 		{
 			Builtin builtin{createDebugData(), *builtinHandle};
 			advance();
 			return builtin;
 		}
-		else if (auto verbatimHandle = m_dialect.verbatim(YulString(currentLiteral())))
+		else if (auto verbatimHandle = m_dialect.verbatim(currentLiteral()))
 		{
 			Verbatim verbatim{createDebugData(), *verbatimHandle};
 			advance();
@@ -780,7 +780,7 @@ NameWithDebugData Parser::parseNameWithDebugData()
 YulName Parser::expectAsmIdentifier()
 {
 	YulName name{currentLiteral()};
-	if (currentToken() == Token::Identifier && m_dialect.builtin(name))
+	if (currentToken() == Token::Identifier && m_dialect.builtin(name.str()))
 		fatalParserError(5568_error, "Cannot use builtin function name \"" + name.str() + "\" as identifier name.");
 	// NOTE: We keep the expectation here to ensure the correct source location for the error above.
 	expectToken(Token::Identifier);
