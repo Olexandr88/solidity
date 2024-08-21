@@ -203,8 +203,8 @@ protected:
 
 	/// If true, analyzes memory and storage content via mload/mstore and sload/sstore.
 	bool m_analyzeStores = true;
-	YulName m_storeFunctionName[static_cast<unsigned>(StoreLoadLocation::Last) + 1];
-	YulName m_loadFunctionName[static_cast<unsigned>(StoreLoadLocation::Last) + 1];
+	std::optional<BuiltinHandle> m_storeFunctionName[static_cast<unsigned>(StoreLoadLocation::Last) + 1];
+	std::optional<BuiltinHandle> m_loadFunctionName[static_cast<unsigned>(StoreLoadLocation::Last) + 1];
 
 	/// Current nesting depth of loops.
 	size_t m_loopDepth{0};

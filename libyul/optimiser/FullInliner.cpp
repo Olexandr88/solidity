@@ -83,7 +83,7 @@ FullInliner::FullInliner(Block& _ast, NameDispenser& _dispenser, Dialect const& 
 	}
 
 	// Check for memory guard.
-	std::vector<FunctionCall*> memoryGuardCalls = findFunctionCalls(_ast, "memoryguard"_yulname);
+	std::vector<FunctionCall*> memoryGuardCalls = findFunctionCalls(_ast, "memoryguard", m_dialect);
 	// We will perform less aggressive inlining, if no ``memoryguard`` call is found.
 	if (!memoryGuardCalls.empty())
 		m_hasMemoryGuard = true;

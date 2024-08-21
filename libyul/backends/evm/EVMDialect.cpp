@@ -391,6 +391,7 @@ EVMDialect::EVMDialect(langutil::EVMVersion _evmVersion, bool _objectAccess):
 	m_memoryLoadFunction = builtin("mload");
 	m_storageStoreFunction = builtin("sstore");
 	m_storageLoadFunction = builtin("sload");
+	m_hashFunction = builtin("keccak256");
 }
 
 std::optional<BuiltinHandle> EVMDialect::builtin(std::string_view _name) const

@@ -79,7 +79,7 @@ struct Dialect
 	virtual std::optional<BuiltinHandle> memoryLoadFunction() const { return std::nullopt; }
 	virtual std::optional<BuiltinHandle> storageStoreFunction() const { return std::nullopt; }
 	virtual std::optional<BuiltinHandle> storageLoadFunction() const { return std::nullopt; }
-	virtual YulName hashFunction() const { return YulName{}; }
+	virtual std::optional<BuiltinHandle> hashFunction() const { return std::nullopt; }
 
 	Literal zeroLiteral() const;
 

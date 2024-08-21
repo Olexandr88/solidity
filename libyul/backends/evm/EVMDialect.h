@@ -92,7 +92,7 @@ struct EVMDialect: public Dialect
 	std::optional<BuiltinHandle> memoryLoadFunction() const override { return m_memoryLoadFunction; }
 	std::optional<BuiltinHandle> storageStoreFunction() const override { return m_storageStoreFunction; }
 	std::optional<BuiltinHandle> storageLoadFunction() const override { return m_storageLoadFunction; }
-	YulName hashFunction() const override { return "keccak256"_yulname; }
+	std::optional<BuiltinHandle> hashFunction() const override { return m_hashFunction; }
 
 	static EVMDialect const& strictAssemblyForEVM(langutil::EVMVersion _version);
 	static EVMDialect const& strictAssemblyForEVMObjects(langutil::EVMVersion _version);
@@ -122,6 +122,7 @@ protected:
 	std::optional<BuiltinHandle> m_memoryLoadFunction;
 	std::optional<BuiltinHandle> m_storageStoreFunction;
 	std::optional<BuiltinHandle> m_storageLoadFunction;
+	std::optional<BuiltinHandle> m_hashFunction;
 };
 
 }

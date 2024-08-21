@@ -32,6 +32,11 @@ struct Dialect;
 struct BuiltinHandle
 {
 	size_t id;
+
+	bool operator==(BuiltinHandle const& _other) const
+	{
+		return id == _other.id;
+	}
 };
 
 /// Handle to reference a verbatim function in the AST
